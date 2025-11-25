@@ -1,0 +1,8 @@
+{
+  "name": "eKotha",
+  "description": "Find and rent rooms in Nepal. AI-powered search, KYC verification, and local payments.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
