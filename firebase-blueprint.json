@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the eKotha application",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["SEEKER", "LANDLORD", "ADMIN"] },
+        "kycStatus": { "type": "string", "enum": ["NOT_STARTED", "PENDING", "VERIFIED", "REJECTED"] },
+        "bio": { "type": "string" },
+        "avatar": { "type": "string" },
+        "phone": { "type": "string" },
+        "kycDocuments": {
+          "type": "object",
+          "properties": {
+            "idImage": { "type": "string" },
+            "selfieImage": { "type": "string" },
+            "submittedAt": { "type": "number" }
+          }
+        }
+      },
+      "required": ["id", "username", "email", "role", "kycStatus"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "A room listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "location": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "isAvailable": { "type": "boolean" },
+        "isExample": { "type": "boolean" },
+        "paymentInfo": {
+          "type": "object",
+          "properties": {
+            "esewaId": { "type": "string" },
+            "khaltiId": { "type": "string" }
+          }
+        }
+      },
+      "required": ["id", "ownerId", "title", "description", "price", "location", "lat", "lng", "features", "images", "isAvailable"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["BOOKING", "SYSTEM", "MESSAGE"] },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "message", "read", "type", "timestamp"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A chat room between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "participantDetails": { "type": "object" },
+        "roomId": { "type": "string" },
+        "roomTitle": { "type": "string" },
+        "updatedAt": { "type": "number" },
+        "lastMessage": { "type": "string" },
+        "unreadCount": { "type": "object" },
+        "pinnedBy": { "type": "array", "items": { "type": "string" } },
+        "typing": { "type": "object" }
+      },
+      "required": ["id", "participants", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message within a chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "readBy": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string", "enum": ["text", "image", "voice", "room_share", "attachment"] },
+        "mediaUrl": { "type": "string" },
+        "replyTo": { "type": "string" },
+        "reactions": { "type": "object" }
+      },
+      "required": ["id", "chatId", "senderId", "text", "timestamp", "readBy"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Room" },
+      "description": "Stores room listings"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Stores user notifications"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Stores chat rooms"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Stores messages within a chat"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' ||
+          request.auth.token.email == "sajandahal794@gmail.com");
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    function isValidEmail(email) {
+      return email is string && (email == "" || email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.username is string && data.username.size() > 0 && data.username.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['SEEKER', 'LANDLORD', 'ADMIN'] &&
+             data.kycStatus in ['NOT_STARTED', 'PENDING', 'VERIFIED', 'REJECTED'];
+    }
+
+    function isValidRoom(data) {
+      return data.ownerId is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.description is string && data.description.size() < 5000 &&
+             data.price is number && data.price >= 0 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
+             data.lat is number && data.lng is number &&
+             data.features is list && data.features.size() <= 50 &&
+             data.images is list && data.images.size() <= 20 &&
+             data.isAvailable is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    (request.resource.data.role != 'ADMIN' || isAdmin()) &&
+                    request.resource.data.kycStatus == 'NOT_STARTED';
+      allow update: if (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'lastSeen'])) ||
+                       (isOwner(userId) && isValidUser(request.resource.data) && 
+                        request.resource.data.role == resource.data.role &&
+                        (request.resource.data.kycStatus == resource.data.kycStatus || request.resource.data.kycStatus == 'PENDING')) || 
+                       isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /rooms/{roomId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAuthenticated() && isValidRoom(request.resource.data) && 
+                    request.resource.data.ownerId == request.auth.uid &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.kycStatus == 'VERIFIED';
+      allow update: if (isDocOwner() && isValidRoom(request.resource.data) && 
+                        request.resource.data.ownerId == resource.data.ownerId) || 
+                       isAdmin();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAdmin() || (isAuthenticated() && (request.resource.data.userId == request.auth.uid || request.resource.data.type == 'MESSAGE'));
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants;
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow delete: if isAdmin();
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isAuthenticated() && 
+                      request.auth.uid == request.resource.data.senderId &&
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow update: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions']);
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}
